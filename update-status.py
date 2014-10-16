@@ -2,6 +2,8 @@
 
 '''A script to update the status of a service in op5 Monitor'''
 
+# Author: Joel Rangsmo <jrangsmo@op5.com>
+
 import argparse
 import requests
 import json
@@ -109,9 +111,9 @@ if update.status_code == 200:
     exit(0)
 
 elif update.status_code == 400:
-    print('CRITICAL - Host "%s" or service "%s" was not found. ' +
-          'Please check your spelling and capitilization'
-          % (args.service, args.host))
+    print('CRITICAL - Host "%s" or service "%s" was not found. '
+          % (args.service, args.host) +
+          'Please check your spelling and capitilization')
 
     exit(2)
 
