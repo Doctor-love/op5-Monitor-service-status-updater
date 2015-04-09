@@ -2,15 +2,28 @@
 
 '''A script to update the status of a service in op5 Monitor'''
 
-# Author: Joel Rangsmo <jrangsmo@op5.com>
+author = 'Joel Rangsmo <jrangsmo@op5.com>'
+url = 'https://github.com/Doctor-love/op5-Monitor-service-status-updater'
+version = '1.1'
 
-import argparse
-import requests
-import json
+try:
+    import argparse
+    import requests
+    import json
+
+except ImportError as missing:
+    print (
+        'Error - could not import all required Python modules\n: "%s"'
+        % missing + 'Dependency installation with pip: '
+        '"# pip install argparse requests json"')
+
+    exit(3)
 
 # Argument parsing
 aparser = argparse.ArgumentParser(
-    description='A script to update the status of a service in op5 Monitor')
+    description=__doc__,
+    epilog='Developed by %s - For more information see: "%s"'
+    % (author, url))
 
 aparser.add_argument('-M', '--monhost',
                      help='Specify op5 Monitor server', required=True)
@@ -44,6 +57,13 @@ aparser.add_argument('-P', '--path',
                      help='Path to command in API',
                      default='/api/command/PROCESS_SERVICE_CHECK_RESULT')
 
+aparser.add_argument('-r', '--port',
+                     help='HTTPS port for API access on the op5 Monitor host',
+                     type=int, default=443)
+
+aparser.add_argument('-v', '--version', help='Display script version',
+                    action='version', version=version)
+
 args = aparser.parse_args()
 
 
@@ -60,22 +80,20 @@ elif args.status == 'CRITICAL':
 elif args.status == 'UNKNOWN':
     statuscode = 3
 
+payload = json.dumps(
+    {"host_name": "%s" % args.host,
+     "service_description": "%s" % args.service,
+     "status_code": "%s" % statuscode,
+     "plugin_output": "%s" % args.servicemsg})
 
 # Service status update
 try:
-    update = requests.post('https://%s%s'
-                           % (args.monhost, args.path),
-                           verify=args.insecure,
-                           timeout=15,
-                           headers={'content-type': 'application/json'},
-                           auth=(args.username, args.password),
-                           data=json.dumps({"host_name": "%s" % args.host,
-                                            "service_description": "%s"
-                                            % args.service,
-                                            "status_code": "%s" % statuscode,
-                                            "plugin_output": "%s"
-                                            % args.servicemsg
-                                            }))
+    update = requests.post(
+        'https://%s:%s%s' % (args.monhost, args.port, args.path),
+        verify=args.insecure, timeout=15,
+        auth=(args.username, args.password),
+        headers={'content-type': 'application/json'},
+        data=payload)
 
 # Exception handling (timeouts, SSL issues, etc)
 except requests.exceptions.Timeout:
@@ -85,14 +103,14 @@ except requests.exceptions.Timeout:
     exit(2)
 
 except requests.exceptions.SSLError:
-    print('CRITICAL - SSL Certificate validation error - ' +
+    print('CRITICAL - SSL certificate validation error - '
           'use "--insecure" to disabled verification')
 
     exit(2)
 
 except requests.exceptions.ConnectionError:
-    print('CRITICAL - Failed to connect to host "%s"'
-          % args.monhost)
+    print('CRITICAL - Failed to connect to host "%s" '
+          'on port %i' % (args.monhost, args.port))
 
     exit(2)
 
@@ -118,7 +136,7 @@ elif update.status_code == 400:
     exit(2)
 
 elif update.status_code == 401:
-    print('CRITICAL - Username, password and/or ' +
+    print('CRITICAL - Username, password and/or '
           'the users priviliges was not accepted by server')
 
     exit(2)
